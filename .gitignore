@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+.turbo/
+dist/
+build/
+*.pyc
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables — never commit real values
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Supabase
+.supabase/
+
+# Testing
+coverage/
+htmlcov/
+.coverage
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# AWS CDK
+cdk.out/
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# Secrets (extra protection)
+*.pem
+*.key
+secrets/

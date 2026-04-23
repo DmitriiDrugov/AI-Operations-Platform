@@ -1,0 +1,68 @@
+{
+  "name": "Missed Payment Reminder",
+  "description": "Daily at 09:00 UTC. Checks for overdue invoices and sends reminders with escalation logic.",
+  "version": "1",
+  "schedule": "0 9 * * *",
+  "nodes": [
+    {
+      "id": "schedule-trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "name": "Daily 09:00 UTC",
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] } }
+    },
+    {
+      "id": "fetch-overdue-invoices",
+      "type": "n8n-nodes-base.supabase",
+      "name": "Fetch Overdue Invoices",
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "invoices",
+        "filters": {
+          "conditions": [
+            { "field": "status", "operator": "eq", "value": "sent" },
+            { "field": "due_date", "operator": "lt", "value": "={{ $now.toISO() }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "loop-invoices",
+      "type": "n8n-nodes-base.splitInBatches",
+      "name": "Process Each Invoice",
+      "parameters": { "batchSize": 1 }
+    },
+    {
+      "id": "calc-days-overdue",
+      "type": "n8n-nodes-base.code",
+      "name": "Calculate Days Overdue",
+      "parameters": {
+        "jsCode": "const dueDate = new Date($input.first().json.due_date);\nconst today = new Date();\nconst daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));\nreturn [{ json: { ...$input.first().json, daysOverdue } }];"
+      }
+    },
+    {
+      "id": "branch-escalation",
+      "type": "n8n-nodes-base.switch",
+      "name": "Escalation Level",
+      "parameters": {
+        "rules": {
+          "rules": [
+            { "value1": "={{ $json.daysOverdue }}", "operation": "smaller", "value2": 3, "output": 0 },
+            { "value1": "={{ $json.daysOverdue }}", "operation": "range", "value2": 3, "value3": 7, "output": 1 },
+            { "value1": "={{ $json.daysOverdue }}", "operation": "largerEqual", "value2": 7, "output": 2 }
+          ]
+        }
+      }
+    },
+    {
+      "id": "send-reminder-email",
+      "type": "n8n-nodes-base.sendGrid",
+      "name": "Send Reminder Email",
+      "parameters": {
+        "fromEmail": "{{ $env.SENDGRID_FROM_EMAIL }}",
+        "toEmail": "={{ $json.guest_email }}",
+        "subject": "Payment reminder for invoice {{ $json.invoice_number }}",
+        "templateId": "d-reminder-template-id"
+      }
+    }
+  ]
+}

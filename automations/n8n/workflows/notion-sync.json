@@ -1,0 +1,90 @@
+{
+  "name": "Notion SOP → Vector Index Sync",
+  "description": "Triggered by Notion webhook when a page is updated. Validates the page is in the known knowledge base, then calls the Python worker to re-embed and upsert the content.",
+  "version": "1",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "type": "n8n-nodes-base.webhook",
+      "name": "Notion Webhook",
+      "parameters": {
+        "path": "notion-page-updated",
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "validate-page",
+      "type": "n8n-nodes-base.code",
+      "name": "Validate Page in Knowledge Base",
+      "parameters": {
+        "jsCode": "const pageId = $input.first().json.page?.id;\nif (!pageId) throw new Error('Missing page id in webhook payload');\nconst validPageIds = $env.NOTION_KNOWLEDGE_BASE_PAGE_IDS.split(',');\nconst isKnownPage = validPageIds.includes(pageId) || $input.first().json.page?.parent?.database_id === $env.NOTION_KNOWLEDGE_BASE_ID;\nreturn [{ json: { pageId, isKnownPage } }];"
+      }
+    },
+    {
+      "id": "branch-known-page",
+      "type": "n8n-nodes-base.if",
+      "name": "Is Known Page?",
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.isKnownPage }}", "value2": true }]
+        }
+      }
+    },
+    {
+      "id": "call-worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "name": "Trigger Worker: Sync Notion Page",
+      "parameters": {
+        "url": "={{ $env.WORKER_API_URL }}/jobs/sync-notion-page",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "page_id", "value": "={{ $json.pageId }}" },
+            { "name": "organisation_id", "value": "={{ $env.ORGANISATION_ID }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wait-for-job",
+      "type": "n8n-nodes-base.wait",
+      "name": "Wait 30s for Job",
+      "parameters": { "amount": 30, "unit": "seconds" }
+    },
+    {
+      "id": "notify-success",
+      "type": "n8n-nodes-base.slack",
+      "name": "Notify: Sync Complete",
+      "parameters": {
+        "channel": "#engineering-alerts",
+        "text": "✅ Knowledge base synced: page {{ $('Validate Page in Knowledge Base').item.json.pageId }}"
+      }
+    },
+    {
+      "id": "notify-error",
+      "type": "n8n-nodes-base.slack",
+      "name": "Notify: Sync Error",
+      "parameters": {
+        "channel": "#engineering-alerts",
+        "text": "❌ Knowledge base sync failed for unknown page. Webhook payload: {{ JSON.stringify($input.first().json) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Notion Webhook": { "main": [[{ "node": "Validate Page in Knowledge Base" }]] },
+    "Validate Page in Knowledge Base": { "main": [[{ "node": "Is Known Page?" }]] },
+    "Is Known Page?": {
+      "main": [
+        [{ "node": "Trigger Worker: Sync Notion Page" }],
+        [{ "node": "Notify: Sync Error" }]
+      ]
+    },
+    "Trigger Worker: Sync Notion Page": { "main": [[{ "node": "Wait 30s for Job" }]] },
+    "Wait 30s for Job": { "main": [[{ "node": "Notify: Sync Complete" }]] }
+  }
+}
