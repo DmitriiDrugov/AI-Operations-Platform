@@ -1,251 +1,114 @@
-<div align="center">
-
 # AI Operations Platform
 
-**Единая операционная платформа для wellness-клиник, медицинских спа и отелей**
+Operations backend for wellness clinics, medical spas, and hotel businesses. Covers lead intake, guest profiles, booking lifecycle, scheduling, billing, clinical records, multi-channel comms, and an AI copilot for staff.
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
-[![Claude](https://img.shields.io/badge/Claude-Sonnet_4.6-D97757?style=flat-square&logo=anthropic&logoColor=white)](https://anthropic.com)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+Target scale: 10–200 staff, 5–500 concurrent guests, single or small multi-location.
 
-</div>
-
----
-
-## Обзор
-
-AI Operations Platform — production-ready монорепозиторий для автоматизации операций в сфере велнес и гостеприимства. Платформа объединяет CRM, управление бронированиями, клинические записи, биллинг, многоканальные коммуникации и AI-ассистента для персонала в едином решении.
-
-**Для кого:** 10–200 сотрудников, 5–500 одновременных гостей, одна или несколько локаций.
-
-### Ключевые возможности
-
-| Модуль | Описание |
-|---|---|
-| **CRM и лиды** | Автоматическая классификация лидов через AI, воронка, профили гостей с шифрованием PII |
-| **Бронирования** | Полный жизненный цикл: создание → подтверждение → чекин → чекаут, обнаружение конфликтов |
-| **Клинические записи** | Безопасное хранение медицинских данных с RLS-изоляцией по арендатору |
-| **Биллинг** | Пакеты услуг, Stripe-интеграция, автоматические напоминания о просроченных платежах |
-| **AI Copilot** | RAG-ассистент для персонала: поиск по базе знаний, резюме истории гостя, подсказки по SOP |
-| **Коммуникации** | Email (SendGrid), SMS и WhatsApp (Twilio), автоматизированные последовательности |
-| **Аналитика** | Утилизация, выручка, конверсия апселлов — ночная агрегация через фоновый воркер |
-
----
-
-## Архитектура
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        apps/admin                               │
-│              Next.js 14  ·  TypeScript  ·  Tailwind             │
-│         Staff Dashboard: CRM, Schedule, Billing, Copilot        │
-└────────────────────────┬────────────────────────────────────────┘
-                         │ HTTP / Supabase Realtime
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-  ┌───────────────┐ ┌─────────┐ ┌──────────────┐
-  │ services/     │ │Supabase │ │ services/    │
-  │  ai-core      │ │Postgres │ │  worker      │
-  │ FastAPI + RAG │ │+pgvector│ │  ARQ + Redis │
-  └───────┬───────┘ └────┬────┘ └──────┬───────┘
-          │              │             │
-          ▼              ▼             ▼
-      Claude API     Row-Level     AWS SQS
-    OpenAI Embeds    Security      Outbox
-      LangChain     11 schemas    Stripe / Twilio
-                                  SendGrid / Notion
-```
-
-Платформа спроектирована вокруг **11 bounded contexts** (CRM, гости, бронирования, расписание, клиника, биллинг, коммуникации, база знаний, аналитика, аудит, общее). Каждый контекст — отдельная Postgres-схема с собственными RLS-политиками.
-
----
-
-## Стек технологий
-
-### Frontend
-- **Next.js 14** (App Router) + **TypeScript** + **Tailwind CSS**
-- **Radix UI** — доступные, компонуемые примитивы
-- **React Query** (@tanstack) — серверное состояние
-- **React Hook Form** + **Zod** — типобезопасные формы и валидация
-
-### AI-сервис
-- **FastAPI** (Python 3.12) — высокопроизводительный async API
-- **Anthropic Claude** (`claude-sonnet-4-6`) — ядро рассуждений
-- **OpenAI** (`text-embedding-3-small`) — векторные эмбеддинги для RAG
-- **LangChain 0.2+** — агентные потоки и RAG-пайплайн
-
-### Инфраструктура
-- **Supabase** — Postgres + pgvector + Auth + Realtime + Storage
-- **ARQ + Redis** — фоновые задачи и cron-джобы
-- **AWS SQS + Lambda** — надёжные очереди и webhook-обработчики
-- **Stripe** — платежи и инвойсы
-- **Twilio** — SMS и WhatsApp
-- **SendGrid** — транзакционный email
-
-### Автоматизация
-- **n8n** — сложные воркфлоу (Notion sync, эскалации)
-- **Make** — визуальные коммуникационные сценарии
-- **Zapier** — интеграции третьих сторон
-
----
-
-## Структура репозитория
+## Repository layout
 
 ```
 .
 ├── apps/
-│   └── admin/                  # Staff dashboard (Next.js 14)
+│   └── admin/              # Staff dashboard (Next.js 14)
 ├── services/
-│   ├── ai-core/                # AI API (FastAPI + LangChain + Claude)
-│   └── worker/                 # Background jobs (ARQ + Redis)
+│   ├── ai-core/            # Copilot, RAG, lead classification (FastAPI)
+│   └── worker/             # Background jobs: outbox, Notion sync, analytics (ARQ)
 ├── packages/
-│   ├── shared-types/           # Zod-схемы и TypeScript-типы
-│   └── prompts/                # Промпт-шаблоны (без деплоя)
+│   ├── shared-types/       # Zod schemas and TypeScript types shared across apps
+│   └── prompts/            # Prompt templates — editable without a deploy
 ├── infra/
 │   └── db/
-│       ├── migrations/         # SQL-миграции (Supabase CLI)
-│       └── seeds/              # Начальные данные
+│       ├── migrations/     # SQL migrations (Supabase CLI)
+│       └── seeds/
 ├── automations/
-│   ├── n8n/                    # Воркфлоу-конфиги
-│   ├── make/                   # Blueprints
-│   └── zapier/                 # Документация интеграций
-├── docs/                       # Проектная документация
-│   ├── PRD.md
-│   ├── ARCHITECTURE.md
-│   ├── DATA_MODEL.md
-│   ├── SECURITY.md
-│   └── ADR/                    # Architecture Decision Records
-├── ROADMAP.md                  # 90-дневный план
-├── TICKETS.md                  # MVP-тикеты
-└── .env.example                # Все переменные окружения
+│   ├── n8n/                # Complex workflows (Notion sync, escalations)
+│   ├── make/               # Communication sequences
+│   └── zapier/             # Third-party intake integrations
+└── docs/                   # Design docs, ADRs
 ```
 
----
+## Stack
 
-## Быстрый старт
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 14, TypeScript, Tailwind CSS, Radix UI, React Query, Zod |
+| AI service | Python 3.12, FastAPI, LangChain, Claude (`claude-sonnet-4-6`), OpenAI embeddings |
+| Background jobs | ARQ, Redis |
+| Database | Supabase — Postgres + pgvector + Auth + Realtime |
+| Async events | AWS SQS + Lambda |
+| Payments | Stripe |
+| Messaging | Twilio (SMS, WhatsApp), SendGrid |
+| Automation | n8n, Make, Zapier |
 
-### Требования
+The schema is split across 11 Postgres schemas (crm, guests, bookings, scheduling, clinical, billing, comms, knowledge, analytics, audit, shared). Multi-tenant isolation is enforced via RLS on every table.
 
-- **Node.js** 20+ и **npm** 10+
-- **Python** 3.12+
-- **Docker** и **Docker Compose**
-- **Supabase CLI** (`npm install -g supabase`)
+## Getting started
 
-### 1. Клонирование и зависимости
+**Prerequisites:** Node.js 20+, Python 3.12+, Docker, Supabase CLI
 
 ```bash
-git clone https://github.com/dmitriidrugov/ai-operations-platform.git
-cd ai-operations-platform
+# 1. Install dependencies
 npm install
-```
 
-### 2. Переменные окружения
-
-```bash
+# 2. Environment variables
 cp .env.example .env.local
-```
+# Fill in Supabase, Anthropic, OpenAI, AWS, Redis keys — see .env.example for all 57 vars
 
-Заполните обязательные ключи в `.env.local`:
+# 3. Start local Supabase and apply migrations
+supabase start
+npm run db:migrate
 
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-
-# AI
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-
-# AWS
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-```
-
-### 3. База данных
-
-```bash
-supabase start          # Запуск локального Supabase
-npm run db:migrate      # Применение миграций
-```
-
-### 4. Запуск сервисов
-
-```bash
-# Все сервисы через Turbo
+# 4. Run all services
 npm run dev
 
-# Или по отдельности:
-cd apps/admin       && npm run dev                          # → http://localhost:3001
+# Or individually:
+cd apps/admin       && npm run dev                           # :3001
 cd services/ai-core && uvicorn main:app --reload --port 8000
 cd services/worker  && arq main.WorkerConfig
 ```
 
----
+## Scripts
 
-## Скрипты
-
-| Команда | Описание |
+| Command | What it does |
 |---|---|
-| `npm run dev` | Запуск всех сервисов через Turbo |
-| `npm run build` | Сборка всех пакетов |
-| `npm test` | Тесты (Vitest + Pytest) |
+| `npm run dev` | Start all services via Turbo |
+| `npm run build` | Build all packages |
+| `npm test` | Vitest (TS) + Pytest (Python) |
 | `npm run lint` | ESLint + Ruff |
-| `npm run db:migrate` | Применение SQL-миграций |
-| `npm run db:generate-types` | Генерация TypeScript-типов из Supabase |
+| `npm run db:migrate` | Apply SQL migrations |
+| `npm run db:generate-types` | Generate TypeScript types from Supabase schema |
 
----
+## Architecture notes
 
-## Принципы безопасности
+**AI copilot** — RAG over pgvector with a Notion knowledge base. Staff asks a question; the service retrieves relevant SOP chunks and passes them with the guest's history summary to Claude. User-supplied text is always in the `user` role, never injected into the `system` prompt.
 
-- **RLS как граница безопасности** — мультиарендная изоляция на уровне Postgres, JWT-клеймы прошиты в политики
-- **Шифрование PII** — персональные данные гостей зашифрованы на уровне приложения
-- **Outbox-паттерн** — каждый внешний сайд-эффект проходит через таблицу `outbox` в БД, гарантируя отсутствие потери данных
-- **Защита от prompt injection** — пользовательский текст всегда в роли `user`, никогда в `system`
-- **Детерминированность критичного кода** — биллинг, расписание и валидация никогда не делегируются AI
+**Outbox pattern** — every side effect that touches an external API (email, SMS, Stripe) is written to an `outbox` table first. The worker polls it every 5 seconds and publishes to SQS. This means no silent data loss on network failures.
 
-Подробнее: [`docs/SECURITY.md`](docs/SECURITY.md)
+**Determinism boundary** — billing calculations, scheduling conflict checks, and all state transitions are deterministic code. AI is used only for language tasks (summarisation, classification, search).
 
----
+**RLS as the security boundary** — tenant isolation is enforced at the Postgres level via JWT claims, not in application code.
 
-## Документация
+## Deployment targets
 
-| Документ | Содержание |
+| Service | Platform |
 |---|---|
-| [`docs/PRD.md`](docs/PRD.md) | Продуктовые требования, роли пользователей, пользовательские сценарии |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Высокоуровневый дизайн, bounded contexts |
-| [`docs/APPLICATION_DESIGN.md`](docs/APPLICATION_DESIGN.md) | API-дизайн, модели запросов/ответов |
-| [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) | Полные связи сущностей и схемы |
-| [`docs/AUTOMATION_LAYER.md`](docs/AUTOMATION_LAYER.md) | Стратегия интеграции n8n, Make, Zapier |
-| [`docs/SECURITY.md`](docs/SECURITY.md) | Аутентификация, RLS, шифрование, управление секретами |
-| [`docs/ADR/`](docs/ADR/) | Architecture Decision Records |
-| [`ROADMAP.md`](ROADMAP.md) | 90-дневный план разработки MVP |
-| [`TICKETS.md`](TICKETS.md) | Детальный список задач для MVP |
-
----
-
-## Деплой
-
-| Сервис | Платформа |
-|---|---|
-| Admin App | Vercel |
-| AI Core | AWS ECS Fargate |
+| Admin app | Vercel |
+| AI core | AWS ECS Fargate |
 | Worker | AWS ECS Fargate |
-| Database | Supabase (managed Postgres) |
+| Database | Supabase |
 | Queues | AWS SQS + Lambda |
-| Secrets | AWS Secrets Manager (staging/prod) |
-| Логи | AWS CloudWatch + OpenTelemetry |
+| Secrets | AWS Secrets Manager (staging/prod), `.env.local` (dev) |
 
----
+## Documentation
 
-## Лицензия
-
-MIT © 2026 Dmitrii Drugov
+| | |
+|---|---|
+| [docs/PRD.md](docs/PRD.md) | Product requirements, user roles, workflows |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, bounded contexts |
+| [docs/APPLICATION_DESIGN.md](docs/APPLICATION_DESIGN.md) | API design, request/response models |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Entity relationships and full schema |
+| [docs/AUTOMATION_LAYER.md](docs/AUTOMATION_LAYER.md) | n8n / Make / Zapier integration strategy |
+| [docs/SECURITY.md](docs/SECURITY.md) | Auth, RLS, encryption, secret management |
+| [docs/ADR/](docs/ADR/) | Architecture decision records |
+| [ROADMAP.md](ROADMAP.md) | 90-day build plan |
+| [TICKETS.md](TICKETS.md) | MVP ticket list |
